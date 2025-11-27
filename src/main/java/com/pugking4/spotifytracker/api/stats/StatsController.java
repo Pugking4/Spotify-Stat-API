@@ -3,7 +3,10 @@ package com.[REDACTED].spotifytracker.api.stats;
 import com.[REDACTED].spotifytracker.api.data.DatabaseWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -119,6 +122,16 @@ class StatsController {
         Map<String, Object> stats = new HashMap<>();
         stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.LAST_YEAR));
         return stats;
+    }
+
+    @GetMapping("/stats/time/rolling")
+    public ResponseEntity<Map<String, Object>> rolling(@RequestParam int hours) {
+        if (hours < 0) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("top_tracks", DatabaseWrapper.getTopTracks(hours));
+        return new ResponseEntity<>(stats, HttpStatus.OK);
     }
 
 }
