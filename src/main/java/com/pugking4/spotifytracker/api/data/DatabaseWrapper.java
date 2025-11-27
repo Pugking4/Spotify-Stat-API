@@ -1,13 +1,13 @@
 package com.[REDACTED].spotifytracker.api.data;
 import java.sql.*;
 
-import ch.qos.logback.core.joran.sanity.Pair;
 import com.[REDACTED].spotifytracker.api.stats.Calendar;
 import com.[REDACTED].spotifytracker.dto.Album;
 import com.[REDACTED].spotifytracker.dto.Artist;
 import com.[REDACTED].spotifytracker.dto.Track;
+import com.[REDACTED].spotifytracker.api.data.Pair;
 
-import java.time.*; // hahahahahahahahah
+import java.time.*;
 import java.util.*;
 
 public class DatabaseWrapper {
@@ -27,33 +27,33 @@ public class DatabaseWrapper {
         }
     }
 
-    private static LocalDateTime getCutoffForMode(Calendar mode) {
+    private static Pair<LocalDateTime, LocalDateTime> getCutoffForMode(Calendar mode) {
         return switch(mode) {
-            case DAILY -> LocalDate.now().atStartOfDay();
-            case WEEKLY -> LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay();
-            case MONTHLY -> LocalDate.now().withDayOfMonth(1).atStartOfDay();
-            case YEARLY -> LocalDate.now().withDayOfYear(1).atStartOfDay();
-            case YESTERDAY -> LocalDate.now().minusDays(1).atStartOfDay();
-            case LAST_WEEK -> LocalDate.now().minusWeeks(1).with(java.time.DayOfWeek.MONDAY).atStartOfDay();
-            case LAST_MONTH -> LocalDate.now().minusMonths(1).withDayOfMonth(1).atStartOfDay();
-            case LAST_YEAR -> LocalDate.now().minusYears(1).withDayOfYear(1).atStartOfDay();
+            case DAILY -> new Pair<>(LocalDateTime.now(), LocalDate.now().atStartOfDay());
+            case WEEKLY -> new Pair<>(LocalDateTime.now(), LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay());
+            case MONTHLY -> new Pair<>(LocalDateTime.now(), LocalDate.now().withDayOfMonth(1).atStartOfDay());
+            case YEARLY -> new Pair<>(LocalDateTime.now(), LocalDate.now().withDayOfYear(1).atStartOfDay());
+            case YESTERDAY -> new Pair<>(LocalDate.now().atStartOfDay(), LocalDate.now().minusDays(1).atStartOfDay());
+            case LAST_WEEK -> new Pair<>(LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay(), LocalDate.now().minusWeeks(1).with(java.time.DayOfWeek.MONDAY).atStartOfDay());
+            case LAST_MONTH -> new Pair<>(LocalDate.now().withDayOfMonth(1).atStartOfDay(), LocalDate.now().minusMonths(1).withDayOfMonth(1).atStartOfDay());
+            case LAST_YEAR -> new Pair<>(LocalDate.now().withDayOfYear(1).atStartOfDay(), LocalDate.now().minusYears(1).withDayOfYear(1).atStartOfDay());
         };
     }
 
-    private static LocalDateTime getCutoffForHours(int hours) {
-        return LocalDateTime.now().minusHours(hours);
+    private static Pair<LocalDateTime, LocalDateTime> getCutoffForHours(int hours) {
+        return new Pair<>(LocalDateTime.now(), LocalDateTime.now().minusHours(hours));
     }
 
-    public static Map<Track, Integer> getTopTracks(Calendar mode) {
+    public static List<Map<String, Object>> getTopTracks(Calendar mode) {
         return getTopTracks(getCutoffForMode(mode));
     }
 
-    public static Map<Track, Integer> getTopTracks(int hours) {
+    public static List<Map<String, Object>> getTopTracks(int hours) {
         return getTopTracks(getCutoffForHours(hours));
     }
 
-    private static Map<Track, Integer> getTopTracks(LocalDateTime cutoffPeriod) {
-        Map<Track, Integer> topTracks = new HashMap<>();
+    private static List<Map<String, Object>> getTopTracks(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
+        List<Map<String, Object>> topTracks = new ArrayList<>();
 
         try {
             String sql = """
@@ -61,7 +61,7 @@ public class DatabaseWrapper {
                     FROM track_history AS th
                              JOIN tracks AS t ON th.track_id = t.id
                              JOIN albums AS a ON th.album_id = a.id
-                    WHERE th.time_finished > ?
+                    WHERE th.time_finished > ? AND th.time_finished < ?
                     GROUP BY t.id, t.name, t.album_id, t.duration_ms, t.is_explicit, t.is_local, a.name, a.cover, a.release_date, a.release_date_precision, a.album_type
                     ORDER BY COUNT(th.track_id) DESC
                     LIMIT 5;
@@ -69,28 +69,31 @@ public class DatabaseWrapper {
 
 
             PreparedStatement st = db.prepareStatement(sql);
-            st.setTimestamp(1, Timestamp.valueOf(cutoffPeriod));
+            st.setTimestamp(2, Timestamp.valueOf(trackingPeriod.left()));
+            st.setTimestamp(1, Timestamp.valueOf(trackingPeriod.right()));
             ResultSet rs = st.executeQuery();
             while (rs.next()) {
-                System.out.println(rs.getString(1));
-                String albumID = rs.getString("album_id");
-                Album album = new Album(albumID,
-                        rs.getString("album_name"),
-                        rs.getString("cover"),
-                        rs.getTimestamp("release_date").toLocalDateTime().toLocalDate(),
-                        rs.getString("release_date_precision"),
-                        rs.getString("album_type"),
-                        getAlbumArtists(albumID));
-                String trackID = rs.getString("id");
-                Track track = new Track(trackID,
-                        rs.getString("name"),
-                        album,
-                        rs.getInt("duration_ms"),
-                        rs.getBoolean("is_explicit"),
-                        rs.getBoolean("is_local"),
-                        getTrackArtists(trackID));
-                int count = rs.getInt("count");
-                topTracks.put(track, count);
+                Map<String, Object> trackData = new HashMap<>();
+                trackData.put("id", rs.getString("id"));
+                trackData.put("name", rs.getString("name"));
+                trackData.put("album_id", rs.getString("album_id"));
+                trackData.put("duration_ms", rs.getInt("duration_ms"));
+                trackData.put("is_explicit", rs.getBoolean("is_explicit"));
+                trackData.put("is_local", rs.getBoolean("is_local"));
+
+                Map<String, Object> albumData = new HashMap<>();
+                albumData.put("name", rs.getString("album_name"));
+                albumData.put("cover", rs.getString("cover"));
+                albumData.put("release_date", rs.getTimestamp("release_date").toLocalDateTime().toLocalDate().toString());
+                albumData.put("release_date_precision", rs.getString("release_date_precision"));
+                albumData.put("album_type", rs.getString("album_type"));
+                trackData.put("album", albumData);
+
+                trackData.put("play_count", rs.getInt("count"));
+
+                // Add artists list as needed, e.g., trackData.put("artists", getTrackArtists(rs.getString("id")));
+
+                topTracks.add(trackData);
             }
             rs.close();
             st.close();
