@@ -1,8 +1,8 @@
 package com.[REDACTED].spotifytracker.api.stats;
 
 import com.[REDACTED].spotifytracker.api.data.DatabaseWrapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
+import com.[REDACTED].spotifytracker.api.data.Pair;
+import com.[REDACTED].spotifytracker.dto.PlayedTrack;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,12 +42,13 @@ class StatsController {
         sub categories for time based stats:
 
         tracks:
+            ○ most played tracks (different than distribution, contains cover) (top 5)
+            ☩ totals (for everything, ms, # tracks, artists,
             ☩ genre distribution (% with # in subtext)
             ☩ track distribution
             ☩ most niche genre (if supported)
             ☩ most popular genre (if supported)
-            ○ most played tracks (different than distrobution, contains cover) (top 5)
-            ☩ avg song length
+            ○ avg song length
             ☩ longest song length
             ☩ shortest song length
             ☩ total minutes/hours played per day, week, month, year (depends on calendar mode/rolling length)
@@ -82,56 +86,78 @@ class StatsController {
         return info;
     }
 
-    @GetMapping("/stats/time/calendar/incomplete/daily")
-    public Map<String, Object> incompleteDaily() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.DAILY));
-        return stats;
+    @GetMapping("/stats/time/calendar/today")
+    public Map<String, Object> today() {
+        return getTimeStats(getTrackingPeriod(Calendar.THIS_DAY));
     }
 
-    @GetMapping("/stats/time/calendar/complete/daily")
-    public Map<String, Object> completeDaily() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.YESTERDAY));
-        return stats;
+    @GetMapping("/stats/time/calendar/day")
+    public Map<String, Object> day(@RequestParam(required = false) Integer daysBack) {
+        return getTimeStats(getTrackingPeriod(Calendar.DAY));
     }
 
-    @GetMapping("/stats/time/calendar/incomplete/weekly")
-    public Map<String, Object> incompleteWeekly() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.WEEKLY));
-        return stats;
+    @GetMapping("/stats/time/calendar/this-week")
+    public Map<String, Object> thisWeek() {
+        return getTimeStats(getTrackingPeriod(Calendar.THIS_WEEK));
     }
 
-    @GetMapping("/stats/time/calendar/complete/weekly")
-    public Map<String, Object> completeWeekly() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.LAST_WEEK));
-        return stats;
+    @GetMapping("/stats/time/calendar/week")
+    public Map<String, Object> week(@RequestParam(required = false) Integer weeksBack) {
+        return getTimeStats(getTrackingPeriod(Calendar.WEEK));
     }
 
-    @GetMapping("/stats/time/calendar/incomplete/yearly")
-    public Map<String, Object> incompleteYearly() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.YEARLY));
-        return stats;
+    @GetMapping("/stats/time/calendar/this-month")
+    public Map<String, Object> thisMonth() {
+        return getTimeStats(getTrackingPeriod(Calendar.THIS_MONTH));
     }
 
-    @GetMapping("/stats/time/calendar/complete/yearly")
-    public Map<String, Object> completeYearly() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(Calendar.LAST_YEAR));
-        return stats;
+    @GetMapping("/stats/time/calendar/month")
+    public Map<String, Object> month(@RequestParam(required = false) Integer monthsBack) {
+        return getTimeStats(getTrackingPeriod(Calendar.MONTH));
+    }
+
+    @GetMapping("/stats/time/calendar/this-year")
+    public Map<String, Object> thisYear() {
+        return getTimeStats(getTrackingPeriod(Calendar.THIS_YEAR));
+    }
+
+    @GetMapping("/stats/time/calendar/year")
+    public Map<String, Object> year(@RequestParam(required = false) Integer yearsBack) {
+        return getTimeStats(getTrackingPeriod(Calendar.YEAR));
     }
 
     @GetMapping("/stats/time/rolling")
-    public ResponseEntity<Map<String, Object>> rolling(@RequestParam int hours) {
-        if (hours < 0) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", DatabaseWrapper.getTopTracks(hours));
+    public ResponseEntity<Map<String, Object>> rolling(@RequestParam Integer endHours, @RequestParam(required = false) Integer startHours) {
+        if (endHours < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        var stats = getTimeStats(getTrackingPeriod(endHours));
         return new ResponseEntity<>(stats, HttpStatus.OK);
+    }
+
+    private static Map<String, Object> getTimeStats(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
+        List<PlayedTrack> trackData = DatabaseWrapper.collectAllData(trackingPeriod);
+        StatsService service = new StatsService(trackData);
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("top_tracks", service.getTopTracks());
+        stats.put("average_duration", service.getAverageSongDuration());
+        stats.put("single_value_totals", service.getTotals());
+        return stats;
+    }
+
+    private static Pair<LocalDateTime, LocalDateTime> getTrackingPeriod(Calendar mode) {
+        return switch(mode) {
+            case THIS_DAY -> new Pair<>(LocalDateTime.now(), LocalDate.now().atStartOfDay());
+            case THIS_WEEK -> new Pair<>(LocalDateTime.now(), LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay());
+            case THIS_MONTH -> new Pair<>(LocalDateTime.now(), LocalDate.now().withDayOfMonth(1).atStartOfDay());
+            case THIS_YEAR -> new Pair<>(LocalDateTime.now(), LocalDate.now().withDayOfYear(1).atStartOfDay());
+            case DAY -> new Pair<>(LocalDate.now().atStartOfDay(), LocalDate.now().minusDays(1).atStartOfDay());
+            case WEEK -> new Pair<>(LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay(), LocalDate.now().minusWeeks(1).with(java.time.DayOfWeek.MONDAY).atStartOfDay());
+            case MONTH -> new Pair<>(LocalDate.now().withDayOfMonth(1).atStartOfDay(), LocalDate.now().minusMonths(1).withDayOfMonth(1).atStartOfDay());
+            case YEAR -> new Pair<>(LocalDate.now().withDayOfYear(1).atStartOfDay(), LocalDate.now().minusYears(1).withDayOfYear(1).atStartOfDay());
+        };
+    }
+
+    private static Pair<LocalDateTime, LocalDateTime> getTrackingPeriod(int hours) {
+        return new Pair<>(LocalDateTime.now(), LocalDateTime.now().minusHours(hours));
     }
 
 }
