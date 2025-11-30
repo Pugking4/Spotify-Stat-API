@@ -26,11 +26,11 @@ class StatsController {
         info.put("message", "Welcome to Spotify Tracker API, this API retrieves various stats from my listening history.");
         info.put("version", "1.0");
 
-        String[] endpoints = new String[] {"/stats/api", "/stats/time/rolling?hours=",
+        /*String[] endpoints = new String[] {"/stats/api", "/stats/time/rolling?hours=",
                 "/stats/time/calendar/complete/daily", "/stats/time/calendar/complete/weekly", "/stats/time/calendar/complete/monthly",
                 "/stats/time/calendar/complete/yearly", "/stats/time/calendar/incomplete/daily", "/stats/time/calendar/incomplete/weekly", "/stats/time/calendar/incomplete/monthly",
                 "/stats/time/calendar/incomplete/yearly", "/stats/time/all-time", "/stats/artist?name=", "/stats/genre?name=",
-                "/stats/album?name=", "/stats/track?name=?artist=", "/stats/devices?name=", "/stats/context?type="};
+                "/stats/album?name=", "/stats/track?name=?artist=", "/stats/devices?name=", "/stats/context?type="};*/
         /*
         api stats:
             running time
@@ -43,23 +43,23 @@ class StatsController {
 
         tracks:
             ○ most played tracks (different than distribution, contains cover) (top 5)
-            ☩ totals (for everything, ms, # tracks, artists,
-            ☩ genre distribution (% with # in subtext)
-            ☩ track distribution
-            ☩ most niche genre (if supported)
-            ☩ most popular genre (if supported)
+            ○ totals (for everything, ms, # tracks, artists,
+            !☩ genre distribution (% with # in subtext)
+            !☩ most niche genre (if supported)
+            !☩ most popular genre (if supported)
             ○ avg song length
-            ☩ longest song length
-            ☩ shortest song length
-            ☩ total minutes/hours played per day, week, month, year (depends on calendar mode/rolling length)
-            ☩ most active listening time (hotspots on 24hr format)
-            ☩ current streak of listening (in days)
-            ☩ longest listening session (without 15 min break)
-            ☩ Most Listened Time Blocks (top 10, include more info about top one above)
-            ☩ average session length
-            ☩ most common genres for each timeframe (calculate some kind of genre consistency, the highest the more consistent the genres the lower the less and more varied, choose highest for each time period)
-            ☩ how often new songs are played from liked collection and how many (in one day, played for first time in liked collection NOT PLAYLIST)
-            ☩ top days of week, top week of months, top month of years (depends on calendar mode/rolling length)
+            ○ longest song length
+            ○ shortest song length
+            ○ total minutes/hours played per day, week, month, year (depends on calendar mode/rolling length)
+            ○ most active listening time (hotspots on 24hr format)
+            ○ current streak of listening (in days)
+            ○ longest listening session (without 15 min break)
+            !○ Most Listened Time Blocks (top 10, include more info about top one above)
+            ○ average session length
+            !☩ most common genres for each timeframe (calculate some kind of genre consistency, the highest the more consistent the genres the lower the less and more varied, choose highest for each time period)
+            ○ how often new songs are played from liked collection and how many (in one day, played for first time in liked collection NOT PLAYLIST)
+            !☩ top days of week, top week of months, top month of years (depends on calendar mode/rolling length)
+            !☩ track distribution (might not be great, dont really listen on repeat very often)
 
 
         artists:
@@ -78,11 +78,15 @@ class StatsController {
             ☩ most common year of release date
             ☩ distribution of album type
 
+        collection:
+            ☩ context type distribution
+            ☩ added to liked stats
+
         sub categories for specific item based stats:
          */
 
 
-        info.put("endpoints", endpoints);
+        //info.put("endpoints", endpoints);
         return info;
     }
 
@@ -138,8 +142,11 @@ class StatsController {
         StatsService service = new StatsService(trackData);
         Map<String, Object> stats = new HashMap<>();
         stats.put("top_tracks", service.getTopTracks());
-        stats.put("average_duration", service.getAverageSongDuration());
-        stats.put("single_value_totals", service.getTotals());
+        stats.put("single_value_stats", service.getSingleValueStats());
+        stats.put("longest_track", service.getLongestTrack());
+        stats.put("shortest_track", service.getShortestTrack());
+        stats.put("longest_listening_session", service.getLongestListeningSession());
+        stats.put("listening_time_heatmap", service.getListeningTimeHeatMap());
         return stats;
     }
 
