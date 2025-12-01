@@ -77,10 +77,10 @@ public class DatabaseWrapper {
         return topTracks;
     }
 
-    private static List<Map<String, Object>> getAlbumArtists(String albumID) {
+    private static List<Artist> getAlbumArtists(String albumID) {
         try {
             String sql = """
-                    SELECT a.id, a.name
+                    SELECT a.id, a.name, a.followers, a.genres, a.image, a.popularity, a.updated_at
                     FROM (
                         SELECT artist_id
                         FROM album_artist
@@ -97,10 +97,10 @@ public class DatabaseWrapper {
         }
     }
 
-    private static List<Map<String, Object>> getTrackArtists(String trackID) {
+    private static List<Artist> getTrackArtists(String trackID) {
         try {
             String sql = """
-                    SELECT a.id, a.name
+                    SELECT a.id, a.name, a.followers, a.genres, a.image, a.popularity, a.updated_at
                     FROM (
                         SELECT artist_id
                         FROM track_artist
@@ -117,14 +117,28 @@ public class DatabaseWrapper {
         }
     }
 
-    private static List<Map<String, Object>> getCombinationArtists(PreparedStatement ps) {
-        List<Map<String, Object>> artists = new ArrayList<>();
+    private static List<Artist> getCombinationArtists(PreparedStatement ps) {
+        List<Artist> artists = new ArrayList<>();
         try {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                Map<String, Object> artist = new HashMap<>();
-                artist.put("id", rs.getString("id"));
-                artist.put("name", rs.getString("name"));
+                String id = rs.getString("id");
+                String name = rs.getString("name");
+                Integer followers = (Integer) rs.getObject("followers");
+                String rawGenres = rs.getString("genres");
+                List<String> genres = null;
+                if (rawGenres != null && !rawGenres.isEmpty()) {
+                    genres = List.of(rawGenres.split(","));
+                }
+                String image = rs.getString("image");
+                Integer popularity = (Integer) rs.getObject("popularity");
+                Timestamp timeStampAt = rs.getTimestamp("updated_at");
+                Instant updatedAt = null;
+                if (timeStampAt != null) {
+                    updatedAt = timeStampAt.toInstant();
+                }
+
+                Artist artist = new Artist(id, name, followers, genres, image, popularity, updatedAt);
                 artists.add(artist);
             }
             rs.close();
@@ -218,14 +232,10 @@ public class DatabaseWrapper {
             String deviceType = rs.getString("type");
 
             // Get album artists
-            List<Artist> albumArtists = getAlbumArtists(albumId).stream()
-                    .map(map -> new Artist((String) map.get("id"), (String) map.get("name")))
-                    .toList();
+            List<Artist> albumArtists = getAlbumArtists(albumId);
 
             // Get track artists
-            List<Artist> trackArtists = getTrackArtists(trackId).stream()
-                    .map(map -> new Artist((String) map.get("id"), (String) map.get("name")))
-                    .toList();
+            List<Artist> trackArtists = getTrackArtists(trackId);
 
             // Build Album record
             Album album = new Album(albumId, albumName, cover, releaseDate, releaseDatePrecision, albumType, albumArtists);

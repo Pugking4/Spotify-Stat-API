@@ -60,10 +60,12 @@ class StatsController {
             ○ how often new songs are played from liked collection and how many (in one day, played for first time in liked collection NOT PLAYLIST)
             !☩ top days of week, top week of months, top month of years (depends on calendar mode/rolling length)
             !☩ track distribution (might not be great, dont really listen on repeat very often)
+            ☩ get most niche track (atleast 1 month old as new tracks are 0 pop by default)
+            ☩ get most popular track
 
 
         artists:
-            ☩ artist distribution (% with # in subtext)
+            ○ artist distribution (% with # in subtext)
             ☩ most niche artist (if supported)
             ☩ most popular artist (if supported)
             ☩ most common artist pairing (must be >= 2)
@@ -147,6 +149,9 @@ class StatsController {
         stats.put("shortest_track", service.getShortestTrack());
         stats.put("longest_listening_session", service.getLongestListeningSession());
         stats.put("listening_time_heatmap", service.getListeningTimeHeatMap());
+        stats.put("artist_distribution", service.getArtistDistribution());
+        stats.put("most_niche_artist", service.getMostNicheArtist());
+        stats.put("most_popular_artist", service.getMostPopularArtist());
         return stats;
     }
 

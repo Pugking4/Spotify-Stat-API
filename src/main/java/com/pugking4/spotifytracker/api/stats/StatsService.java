@@ -17,6 +17,7 @@ public class StatsService {
     private final Set<Track> distinctTrackData;
     private final Set<Album> distinctAlbumData;
     private final Set<Artist> distinctArtistData; //flat
+    private final String EXCLUDE_ARTIST = "0LyfQWJT6nXafLPZqxe9Of";
 
     private final int MAX_LISTENING_SESSION_GAP_MINUTES = 15;
     private final int TIME_BLOCK_LENGTH_MINUTES = 15; // must be a factor of 60
@@ -42,6 +43,7 @@ public class StatsService {
 
 
     }
+
 
     private static Map<String, Object> convertToMap(Album album) {
         if (album == null) return null;
@@ -360,5 +362,50 @@ public class StatsService {
         map.put("max_duration_total", maxDurationTotal);
 
         return map;
+    }
+
+    public List<Map<String, Object>> getArtistDistribution() {
+        long totalPlays = playedTrackData.size();
+        return distinctArtistData.stream()
+                .map( artist -> {
+                    Map<String, Object> map = convertToMap(artist);
+                    long playCount = playedTrackData.stream()
+                            .filter(pt -> pt.track().artists().contains(artist))
+                            .count();
+                    map.put("play_count", playCount);
+                    map.put("percentage_of_tracks", playCount /  totalPlays);
+                    return map;
+                })
+                .toList();
+    }
+
+    public Map<String, Object> getMostNicheArtist() {
+        List<Artist> filteredArtists = artistData.stream()
+                .filter(a -> !a.id().equals(EXCLUDE_ARTIST))
+                .toList();
+        int minPop = filteredArtists.stream()
+                .mapToInt(Artist::popularity)
+                .min()
+                .orElse(-1);
+
+        return convertToMap(filteredArtists.stream()
+                .filter(a -> a.popularity() == minPop)
+                .min(Comparator.comparingInt(Artist::followers))
+                .orElse(null));
+    }
+
+    public Map<String, Object> getMostPopularArtist() {
+        List<Artist> filteredArtists = artistData.stream()
+                .filter(a -> !a.id().equals(EXCLUDE_ARTIST))
+                .toList();
+        int maxPop = filteredArtists.stream()
+                .mapToInt(Artist::popularity)
+                .max()
+                .orElse(-1);
+
+        return convertToMap(filteredArtists.stream()
+                .filter(a -> a.popularity() == maxPop)
+                .max(Comparator.comparingInt(Artist::followers))
+                .orElse(null));
     }
 }
