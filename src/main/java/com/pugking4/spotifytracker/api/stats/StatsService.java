@@ -64,7 +64,9 @@ public class StatsService {
         map.put("id", artist.id());
         map.put("name", artist.name());
         map.put("followers", artist.followers());
-        map.put("genres", String.join(",", artist.genres()));
+        if (artist.genres() != null) map.put("genres", String.join(",", artist.genres()));
+        else map.put("genres", null);
+
         map.put("image", artist.image());
         map.put("popularity", artist.popularity());
         map.put("updated_at", artist.updatedAt());
