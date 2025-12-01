@@ -63,6 +63,11 @@ public class StatsService {
         Map<String, Object> map = new HashMap<>();
         map.put("id", artist.id());
         map.put("name", artist.name());
+        map.put("followers", artist.followers());
+        map.put("genres", String.join(",", artist.genres()));
+        map.put("image", artist.image());
+        map.put("popularity", artist.popularity());
+        map.put("updated_at", artist.updatedAt());
         return map;
     }
 
