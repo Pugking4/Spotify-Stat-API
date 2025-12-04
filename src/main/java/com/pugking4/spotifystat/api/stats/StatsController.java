@@ -1,8 +1,8 @@
-package com.[REDACTED].spotifytracker.api.stats;
+package com.[REDACTED].spotifystat.api.stats;
 
-import com.[REDACTED].spotifytracker.api.data.DatabaseWrapper;
-import com.[REDACTED].spotifytracker.api.data.Pair;
-import com.[REDACTED].spotifytracker.dto.PlayedTrack;
+import com.[REDACTED].spotifystat.api.data.DatabaseWrapper;
+import com.[REDACTED].spotifystat.api.data.Pair;
+import com.[REDACTED].spotifystat.common.dto.PlayedTrack;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

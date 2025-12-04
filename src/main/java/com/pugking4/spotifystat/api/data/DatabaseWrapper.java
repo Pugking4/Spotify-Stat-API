@@ -1,9 +1,7 @@
-package com.[REDACTED].spotifytracker.api.data;
+package com.[REDACTED].spotifystat.api.data;
 import java.sql.*;
 
-import com.[REDACTED].spotifytracker.api.stats.Calendar;
-import com.[REDACTED].spotifytracker.dto.*;
-import com.[REDACTED].spotifytracker.api.data.Pair;
+import com.[REDACTED].spotifystat.common.dto.*;
 
 import java.time.*;
 import java.util.*;
