@@ -1,8 +1,8 @@
-package com.pugking4.spotifytracker.api.stats;
+package com.pugking4.spotifystat.api.stats;
 
-import com.pugking4.spotifytracker.api.data.DatabaseWrapper;
-import com.pugking4.spotifytracker.api.data.Pair;
-import com.pugking4.spotifytracker.dto.PlayedTrack;
+import com.pugking4.spotifystat.api.data.DatabaseWrapper;
+import com.pugking4.spotifystat.api.data.Pair;
+import com.pugking4.spotifystat.common.dto.PlayedTrack;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

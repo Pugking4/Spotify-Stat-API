@@ -1,7 +1,7 @@
-package com.pugking4.spotifytracker.api.stats;
+package com.pugking4.spotifystat.api.stats;
 
-import com.pugking4.spotifytracker.api.data.DatabaseWrapper;
-import com.pugking4.spotifytracker.dto.*;
+import com.pugking4.spotifystat.api.data.DatabaseWrapper;
+import com.pugking4.spotifystat.common.dto.*;
 
 import java.time.*;
 import java.util.*;
@@ -40,91 +40,6 @@ public class StatsService {
         this.distinctTrackData = new HashSet<>(trackData);
         this.distinctAlbumData = new HashSet<>(albumData);
         this.distinctArtistData = new HashSet<>(artistData);
-
-
-    }
-
-
-    private static Map<String, Object> convertToMap(Album album) {
-        if (album == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", album.id());
-        map.put("name", album.name());
-        map.put("cover", album.cover());
-        map.put("release_date", album.releaseDate() != null ? album.releaseDate().toString() : null);
-        map.put("release_date_precision", album.releaseDatePrecision());
-        map.put("album_type", album.type());
-        map.put("artists", album.artists() != null ? album.artists().stream().map(StatsService::convertToMap).toList() : null);
-        return map;
-    }
-
-    private static Map<String, Object> convertToMap(Artist artist) {
-        if (artist == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", artist.id());
-        map.put("name", artist.name());
-        map.put("followers", artist.followers());
-        if (artist.genres() != null) map.put("genres", String.join(",", artist.genres()));
-        else map.put("genres", null);
-
-        map.put("image", artist.image());
-        map.put("popularity", artist.popularity());
-        map.put("updated_at", artist.updatedAt());
-        return map;
-    }
-
-    private static Map<String, Object> convertToMap(Device device) {
-        if (device == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("name", device.name());
-        map.put("type", device.type());
-        return map;
-    }
-
-    private static Map<String, Object> convertToMap(Track track) {
-        if (track == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", track.id());
-        map.put("name", track.name());
-        map.put("album", track.album() != null ? convertToMap(track.album()) : null);
-        map.put("duration_ms", track.durationMs());
-        map.put("is_explicit", track.isExplicit());
-        map.put("is_local", track.isLocal());
-        map.put("artists", track.artists() != null ? track.artists().stream().map(StatsService::convertToMap).toList() : null);
-        return map;
-    }
-
-    private static Map<String, Object> convertToMap(PlayedTrack playedTrack) {
-        if (playedTrack == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("track", playedTrack.track() != null ? convertToMap(playedTrack.track()) : null);
-        map.put("context_type", playedTrack.contextType());
-        map.put("device", playedTrack.device() != null ? convertToMap(playedTrack.device()) : null);
-        map.put("current_popularity", playedTrack.currentPopularity());
-        map.put("time_finished", playedTrack.time_finished() != null ? playedTrack.time_finished().toString() : null);
-        return map;
-    }
-
-    private static Map<String, Object> convertToMap(Session session) {
-        if (session == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("start", session.start());
-        map.put("end", session.end());
-
-        List<Map<String, Object>> playedTracks = new ArrayList<>();
-        map.put("played_tracks", playedTracks);
-        for (PlayedTrack playedTrack : session.playedTracks()) {
-            playedTracks.add(convertToMap(playedTrack));
-        }
-        return map;
-    }
-
-    private static Map<String, Object> convertToMap(TimeRange timeRange) {
-        if (timeRange == null) return null;
-        Map<String, Object> map = new HashMap<>();
-        map.put("start", timeRange.startTime);
-        map.put("end", timeRange.endTime);
-        return map;
     }
 
     public List<Map<String, Object>> getTopTracks() {
@@ -144,7 +59,7 @@ public class StatsService {
 
         return finalCountedTracks.stream()
                 .map(entry -> {
-                    Map<String, Object> map = convertToMap(entry.getKey());
+                    Map<String, Object> map = entry.getKey().toMap();
                     map.put("play_count", entry.getValue());
                     return map;
                 })
@@ -244,19 +159,20 @@ public class StatsService {
     }
 
     private List<Session> getSessions() {
+        if (playedTrackData.isEmpty()) return Collections.emptyList();
         List<Session> sessions = new ArrayList<>();
         List<PlayedTrack> currentSessionPlayedTracks = new ArrayList<>();
-        Instant previousSong = playedTrackData.getFirst().time_finished();
+        Instant previousSong = playedTrackData.getFirst().timeFinished();
 
         for (PlayedTrack playedTrack : playedTrackData) {
-            Instant currentSong = playedTrack.time_finished();
+            Instant currentSong = playedTrack.timeFinished();
             if (currentSong.isAfter(previousSong.plusSeconds(MAX_LISTENING_SESSION_GAP_MINUTES * 60))) {
                 if (!currentSessionPlayedTracks.isEmpty()) {
                     sessions.add(new Session(
-                            currentSessionPlayedTracks.getFirst().time_finished().minusMillis(
+                            currentSessionPlayedTracks.getFirst().timeFinished().minusMillis(
                                     currentSessionPlayedTracks.getFirst().track().durationMs()
                             ),
-                            currentSessionPlayedTracks.getLast().time_finished().plusMillis(
+                            currentSessionPlayedTracks.getLast().timeFinished().plusMillis(
                                     Math.round(currentSessionPlayedTracks.getLast().track().durationMs() * 0.35)
                             ),
                             new ArrayList<>(currentSessionPlayedTracks)));
@@ -269,8 +185,8 @@ public class StatsService {
 
         if (!currentSessionPlayedTracks.isEmpty()) {
             sessions.add(new Session(
-                    currentSessionPlayedTracks.getFirst().time_finished(),
-                    currentSessionPlayedTracks.getLast().time_finished(),
+                    currentSessionPlayedTracks.getFirst().timeFinished(),
+                    currentSessionPlayedTracks.getLast().timeFinished(),
                     currentSessionPlayedTracks
             ));
         }
@@ -287,15 +203,17 @@ public class StatsService {
     }
 
     public Map<String, Object> getLongestTrack() {
-        return convertToMap(distinctTrackData.stream()
+        return distinctTrackData.stream()
                 .max(Comparator.comparingLong(Track::durationMs))
-                .orElse(null));
+                .map(Track::toMap)
+                .orElse(null);
     }
 
     public Map<String, Object> getShortestTrack() {
-        return convertToMap(distinctTrackData.stream()
+        return distinctTrackData.stream()
                 .min(Comparator.comparingLong(Track::durationMs))
-                .orElse(null));
+                .map(Track::toMap)
+                .orElse(null);
     }
 
     private int getListeningStreakInDays() {
@@ -309,7 +227,7 @@ public class StatsService {
             LocalDate dateForLambda = checkingDate;
             dayFound = allPlayedTrackData.stream()
                     .anyMatch(x -> {
-                        LocalDate playedDate = x.time_finished().atZone(aus).toLocalDate();
+                        LocalDate playedDate = x.timeFinished().atZone(aus).toLocalDate();
                         return playedDate.isEqual(dateForLambda);
                     });
             checkingDate = checkingDate.minusDays(1);
@@ -320,9 +238,10 @@ public class StatsService {
     }
 
     public Map<String, Object> getLongestListeningSession() {
-        return convertToMap(getSessions().stream()
+        return getSessions().stream()
                 .max(Comparator.comparingLong(x -> x.end().toEpochMilli() - x.start().toEpochMilli()))
-                .orElse(null));
+                .map(Session::toMap)
+                .orElse(null);
 
     }
 
@@ -344,9 +263,9 @@ public class StatsService {
         ZoneId aus = ZoneId.of("Australia/Sydney");
 
         for (TimeRange timeBlock : timeBlocks) {
-            var timeBlockMap = convertToMap(timeBlock);
+            var timeBlockMap = timeBlock.toMap();
             List<PlayedTrack> timeBlockPlayedTracks = playedTrackData.stream()
-                    .filter(x -> timeBlock.isWithin(LocalTime.ofInstant(x.time_finished(), aus)))
+                    .filter(x -> timeBlock.isWithin(LocalTime.ofInstant(x.timeFinished(), aus)))
                     .toList();
             long playCount = timeBlockPlayedTracks.size();
             long durationTotal = timeBlockPlayedTracks.stream().mapToLong(x -> x.track().durationMs()).sum();
@@ -375,7 +294,7 @@ public class StatsService {
         long totalPlays = playedTrackData.size();
         return distinctArtistData.stream()
                 .map( artist -> {
-                    Map<String, Object> map = convertToMap(artist);
+                    Map<String, Object> map = artist.toMap();
                     long playCount = playedTrackData.stream()
                             .filter(pt -> pt.track().artists().contains(artist))
                             .count();
@@ -395,10 +314,11 @@ public class StatsService {
                 .min()
                 .orElse(-1);
 
-        return convertToMap(filteredArtists.stream()
+        return filteredArtists.stream()
                 .filter(a -> a.popularity() == minPop)
                 .min(Comparator.comparingInt(Artist::followers))
-                .orElse(null));
+                .map(Artist::toMap)
+                .orElse(null);
     }
 
     public Map<String, Object> getMostPopularArtist() {
@@ -410,9 +330,10 @@ public class StatsService {
                 .max()
                 .orElse(-1);
 
-        return convertToMap(filteredArtists.stream()
+        return filteredArtists.stream()
                 .filter(a -> a.popularity() == maxPop)
                 .max(Comparator.comparingInt(Artist::followers))
-                .orElse(null));
+                .map(Artist::toMap)
+                .orElse(null);
     }
 }

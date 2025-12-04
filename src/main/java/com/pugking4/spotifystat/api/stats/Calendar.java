@@ -1,4 +1,4 @@
-package com.pugking4.spotifytracker.api.stats;
+package com.pugking4.spotifystat.api.stats;
 
 public enum Calendar {
     THIS_DAY,

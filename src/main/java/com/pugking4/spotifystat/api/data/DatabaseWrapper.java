@@ -1,9 +1,7 @@
-package com.pugking4.spotifytracker.api.data;
+package com.pugking4.spotifystat.api.data;
 import java.sql.*;
 
-import com.pugking4.spotifytracker.api.stats.Calendar;
-import com.pugking4.spotifytracker.dto.*;
-import com.pugking4.spotifytracker.api.data.Pair;
+import com.pugking4.spotifystat.common.dto.*;
 
 import java.time.*;
 import java.util.*;
