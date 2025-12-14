@@ -1,12 +1,16 @@
 package com.[REDACTED].spotifystat.api.data;
 import java.sql.*;
 
+import com.[REDACTED].spotifystat.api.stats.Calendar;
+import com.[REDACTED].spotifystat.api.stats.TimeUtility;
 import com.[REDACTED].spotifystat.common.dto.*;
+import org.springframework.stereotype.Repository;
 
 import java.time.*;
 import java.util.*;
 
-public class DatabaseWrapper {
+@Repository
+public class TrackRepository {
     private final static Connection db;
     private final static String url = "jdbc:postgresql://localhost:5433/track-database";
     private final static String username = "[REDACTED]";
@@ -23,59 +27,7 @@ public class DatabaseWrapper {
         }
     }
 
-    public static List<Map<String, Object>> getTopTracks(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
-        List<Map<String, Object>> topTracks = new ArrayList<>();
-
-        try {
-            String sql = """
-                    SELECT t.id, t.name, t.album_id, t.duration_ms, t.is_explicit, t.is_local, a.name as album_name, a.cover, a.release_date, a.release_date_precision, a.album_type, COUNT(th.track_id)
-                    FROM track_history AS th
-                             JOIN tracks AS t ON th.track_id = t.id
-                             JOIN albums AS a ON th.album_id = a.id
-                    WHERE th.time_finished > ? AND th.time_finished < ?
-                    GROUP BY t.id, t.name, t.album_id, t.duration_ms, t.is_explicit, t.is_local, a.name, a.cover, a.release_date, a.release_date_precision, a.album_type
-                    ORDER BY COUNT(th.track_id) DESC
-                    LIMIT 5;
-                """;
-
-
-            PreparedStatement st = db.prepareStatement(sql);
-            st.setTimestamp(2, Timestamp.valueOf(trackingPeriod.left()));
-            st.setTimestamp(1, Timestamp.valueOf(trackingPeriod.right()));
-            ResultSet rs = st.executeQuery();
-            while (rs.next()) {
-                Map<String, Object> trackData = new HashMap<>();
-                trackData.put("id", rs.getString("id"));
-                trackData.put("name", rs.getString("name"));
-                trackData.put("album_id", rs.getString("album_id"));
-                trackData.put("duration_ms", rs.getInt("duration_ms"));
-                trackData.put("is_explicit", rs.getBoolean("is_explicit"));
-                trackData.put("is_local", rs.getBoolean("is_local"));
-
-                Map<String, Object> albumData = new HashMap<>();
-                albumData.put("name", rs.getString("album_name"));
-                albumData.put("cover", rs.getString("cover"));
-                albumData.put("release_date", rs.getTimestamp("release_date").toLocalDateTime().toLocalDate().toString());
-                albumData.put("release_date_precision", rs.getString("release_date_precision"));
-                albumData.put("album_type", rs.getString("album_type"));
-                trackData.put("album", albumData);
-
-                trackData.put("play_count", rs.getInt("count"));
-
-                // Add artists list as needed, e.g., trackData.put("artists", getTrackArtists(rs.getString("id")));
-
-                topTracks.add(trackData);
-            }
-            rs.close();
-            st.close();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-
-        return topTracks;
-    }
-
-    private static List<Artist> getAlbumArtists(String albumID) {
+    private List<Artist> getAlbumArtists(String albumID) {
         try {
             String sql = """
                     SELECT a.id, a.name, a.followers, a.genres, a.image, a.popularity, a.updated_at
@@ -95,7 +47,7 @@ public class DatabaseWrapper {
         }
     }
 
-    private static List<Artist> getTrackArtists(String trackID) {
+    private List<Artist> getTrackArtists(String trackID) {
         try {
             String sql = """
                     SELECT a.id, a.name, a.followers, a.genres, a.image, a.popularity, a.updated_at
@@ -115,7 +67,7 @@ public class DatabaseWrapper {
         }
     }
 
-    private static List<Artist> getCombinationArtists(PreparedStatement ps) {
+    private List<Artist> getCombinationArtists(PreparedStatement ps) {
         List<Artist> artists = new ArrayList<>();
         try {
             ResultSet rs = ps.executeQuery();
@@ -148,62 +100,104 @@ public class DatabaseWrapper {
         return artists;
     }
 
-    public static int getAverageSongDuration(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
-        int avgDuration = -1;
-
-        try {
-            String sql = """
-                    SELECT AVG(t.duration)
-                    FROM track_history AS th
-                             JOIN tracks AS t ON th.track_id = t.id
-                    WHERE th.time_finished > ? AND th.time_finished < ?;
-                """;
-
-
-            PreparedStatement st = db.prepareStatement(sql);
-            st.setTimestamp(2, Timestamp.valueOf(trackingPeriod.left()));
-            st.setTimestamp(1, Timestamp.valueOf(trackingPeriod.right()));
-            ResultSet rs = st.executeQuery();
-            while (rs.next()) {
-                avgDuration = rs.getInt("duration_ms");
-            }
-            rs.close();
-            st.close();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-
-        return avgDuration;
+    public List<PlayedTrack> getRecentlyPlayedTracks(Integer limit) {
+        return findInPeriod(null, limit);
     }
 
-    public static List<PlayedTrack> collectAllData(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
-        List<PlayedTrack> playedTracks = new ArrayList<>();
+    public List<PlayedTrack> findByPeriod(Calendar period) {
+        Pair<LocalDateTime, LocalDateTime> trackingPeriod = TimeUtility.getTrackingPeriod(period);
+        return findInPeriod(trackingPeriod);
+    }
 
+    public List<PlayedTrack> findByHours(int hours) {
+        Pair<LocalDateTime, LocalDateTime> trackingPeriod = TimeUtility.getTrackingPeriod(hours);
+        return findInPeriod(trackingPeriod);
+    }
+
+    public List<PlayedTrack> findAll() {
+        return findInPeriod(null);
+    }
+
+    public List<PlayedTrack> findInPeriod(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
         try {
-            String sql = """
+            PreparedStatement st;
+            if (trackingPeriod == null) {
+                String sql = """
                     SELECT th.*, t.name as track_name, t.duration_ms, t.is_explicit, t.is_local, a.name as album_name, a.cover, a.release_date, a.release_date_precision, a.album_type, d.*
                     FROM track_history AS th
                         JOIN tracks AS t ON th.track_id = t.id
                         JOIN albums AS a ON th.album_id = a.id
                         JOIN devices as d ON th.device_name = d.name
-                    WHERE th.time_finished > ? AND th.time_finished < ?;
+                    ORDER BY th.time_finished DESC;
                 """;
+                st = db.prepareStatement(sql);
+            } else {
+                String sql = """
+                    SELECT th.*, t.name as track_name, t.duration_ms, t.is_explicit, t.is_local, a.name as album_name, a.cover, a.release_date, a.release_date_precision, a.album_type, d.*
+                    FROM track_history AS th
+                        JOIN tracks AS t ON th.track_id = t.id
+                        JOIN albums AS a ON th.album_id = a.id
+                        JOIN devices as d ON th.device_name = d.name
+                    WHERE th.time_finished > ? AND th.time_finished < ?
+                    ORDER BY th.time_finished DESC;
+                """;
+                st = db.prepareStatement(sql);
+                st.setTimestamp(1, Timestamp.valueOf(trackingPeriod.right()));
+                st.setTimestamp(2, Timestamp.valueOf(trackingPeriod.left()));
+            }
 
+            List<PlayedTrack> playedTracks = mapResultSetToPlayedTracks(st.executeQuery());
+            st.close();
+            return playedTracks;
 
-            PreparedStatement st = db.prepareStatement(sql);
-            st.setTimestamp(1, Timestamp.valueOf(trackingPeriod.right()));
-            st.setTimestamp(2, Timestamp.valueOf(trackingPeriod.left()));
-
-            collectAllData2(playedTracks, st);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-
-        return playedTracks;
     }
 
-    private static void collectAllData2(List<PlayedTrack> playedTracks, PreparedStatement st) throws SQLException {
-        ResultSet rs = st.executeQuery();
+    public List<PlayedTrack> findInPeriod(Pair<LocalDateTime, LocalDateTime> trackingPeriod, Integer limit) {
+        try {
+            PreparedStatement st;
+            if (trackingPeriod == null) {
+                String sql = """
+                    SELECT th.*, t.name as track_name, t.duration_ms, t.is_explicit, t.is_local, a.name as album_name, a.cover, a.release_date, a.release_date_precision, a.album_type, d.*
+                    FROM track_history AS th
+                        JOIN tracks AS t ON th.track_id = t.id
+                        JOIN albums AS a ON th.album_id = a.id
+                        JOIN devices as d ON th.device_name = d.name
+                    ORDER BY th.time_finished DESC
+                    LIMIT ?;
+                """;
+                st = db.prepareStatement(sql);
+                st.setInt(1, limit);
+            } else {
+                String sql = """
+                    SELECT th.*, t.name as track_name, t.duration_ms, t.is_explicit, t.is_local, a.name as album_name, a.cover, a.release_date, a.release_date_precision, a.album_type, d.*
+                    FROM track_history AS th
+                        JOIN tracks AS t ON th.track_id = t.id
+                        JOIN albums AS a ON th.album_id = a.id
+                        JOIN devices as d ON th.device_name = d.name
+                    WHERE th.time_finished > ? AND th.time_finished < ?
+                    ORDER BY th.time_finished DESC
+                    LIMIT ?;
+                """;
+                st = db.prepareStatement(sql);
+                st.setTimestamp(1, Timestamp.valueOf(trackingPeriod.right()));
+                st.setTimestamp(2, Timestamp.valueOf(trackingPeriod.left()));
+                st.setInt(3, limit);
+            }
+
+            List<PlayedTrack> playedTracks = mapResultSetToPlayedTracks(st.executeQuery());
+            st.close();
+            return playedTracks;
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<PlayedTrack> mapResultSetToPlayedTracks(ResultSet rs) throws SQLException {
+        List<PlayedTrack> playedTracks = new ArrayList<>();
 
         while (rs.next()) {
             String contextType = rs.getString("context_type");
@@ -249,30 +243,6 @@ public class DatabaseWrapper {
             playedTracks.add(playedTrack);
         }
         rs.close();
-        st.close();
-    }
-
-    public static List<PlayedTrack> collectAllData() {
-        List<PlayedTrack> playedTracks = new ArrayList<>();
-
-        try {
-            String sql = """
-                    SELECT th.*, t.name as track_name, t.duration_ms, t.is_explicit, t.is_local, a.name as album_name, a.cover, a.release_date, a.release_date_precision, a.album_type, d.*
-                    FROM track_history AS th
-                        JOIN tracks AS t ON th.track_id = t.id
-                        JOIN albums AS a ON th.album_id = a.id
-                        JOIN devices as d ON th.device_name = d.name;
-                """;
-
-
-            PreparedStatement st = db.prepareStatement(sql);
-            collectAllData2(playedTracks, st);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-
         return playedTracks;
     }
-
-
 }

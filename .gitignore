@@ -12,6 +12,7 @@ target/
 *.iws
 *.iml
 *.ipr
+.idea/sqlDataSources.xml
 
 ### Eclipse ###
 .apt_generated

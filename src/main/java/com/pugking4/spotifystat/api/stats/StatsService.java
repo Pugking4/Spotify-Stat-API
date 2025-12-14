@@ -1,6 +1,5 @@
 package com.[REDACTED].spotifystat.api.stats;
 
-import com.[REDACTED].spotifystat.api.data.DatabaseWrapper;
 import com.[REDACTED].spotifystat.common.dto.*;
 
 import java.time.*;
@@ -22,9 +21,9 @@ public class StatsService {
     private final int MAX_LISTENING_SESSION_GAP_MINUTES = 15;
     private final int TIME_BLOCK_LENGTH_MINUTES = 15; // must be a factor of 60
 
-    public StatsService(List<PlayedTrack> playedTrackData) {
-        this.playedTrackData = playedTrackData;
-        this.allPlayedTrackData = DatabaseWrapper.collectAllData();
+    public StatsService(List<PlayedTrack> timePeriodData, List<PlayedTrack> allTimeData) {
+        this.playedTrackData = timePeriodData;
+        this.allPlayedTrackData = allTimeData;
         this.excludedPlayedTrackData = new ArrayList<>(allPlayedTrackData);
         this.excludedPlayedTrackData.removeAll(playedTrackData);
         this.trackData = playedTrackData.stream()
@@ -42,7 +41,7 @@ public class StatsService {
         this.distinctArtistData = new HashSet<>(artistData);
     }
 
-    public List<Map<String, Object>> getTopTracks() {
+    public List<Map<String, Object>> getTopFiveTracks() {
         Map<Track, Integer> countedTracks = distinctTrackData.stream()
                 .collect(Collectors.toMap(
                         track -> track,
@@ -66,10 +65,8 @@ public class StatsService {
                 .toList();
     }
 
-    public Map<String, Object> getSingleValueStats() {
+    private Map<String, Object> getTrackSingleValueStats() {
         Map<String, Object> map = new HashMap<>();
-        Map<String, Object> trackMap = new HashMap<>();
-        map.put("track", trackMap);
 
         int totalTracksPlayed = playedTrackData.size();
         int totalUniqueTracksPlayed = distinctTrackData.size();
@@ -77,7 +74,9 @@ public class StatsService {
                 .mapToLong(Track::durationMs)
                 .sum();
         Set<Track> newPlayedTracks = new HashSet<>(trackData);
-        newPlayedTracks.removeAll(excludedPlayedTrackData.stream().map(PlayedTrack::track).collect(Collectors.toSet()));
+        newPlayedTracks.removeAll(excludedPlayedTrackData.stream()
+                .map(PlayedTrack::track)
+                .collect(Collectors.toSet()));
         int totalNewTracksPlayed = newPlayedTracks.size();
         long totalLocalTracksPlayed = trackData.stream()
                 .filter(Track::isLocal)
@@ -85,44 +84,62 @@ public class StatsService {
         long totalExplicitTracksPlayed = trackData.stream()
                 .filter(Track::isExplicit)
                 .count();
-        long averageTrackDuration = Math.round(trackData.stream().mapToLong(Track::durationMs).average().orElse(-1));
-        double averageTrackPopularity = playedTrackData.stream().mapToInt(PlayedTrack::currentPopularity).average().orElse(-1);
+        long averageTrackDuration = Math.round(trackData.stream()
+                .mapToLong(Track::durationMs)
+                .average()
+                .orElse(-1));
+        double averageTrackPopularity = playedTrackData.stream()
+                .mapToInt(PlayedTrack::currentPopularity)
+                .average()
+                .orElse(-1);
 
-        trackMap.put("total_tracks_played", totalTracksPlayed);
-        trackMap.put("total_unique_tracks_played", totalUniqueTracksPlayed);
-        trackMap.put("total_listening_time", totalListeningTime);
-        trackMap.put("total_new_tracks_played", totalNewTracksPlayed);
-        trackMap.put("total_local_tracks_played", totalLocalTracksPlayed);
-        trackMap.put("total_explicit_tracks_played", totalExplicitTracksPlayed);
-        trackMap.put("average_track_duration", averageTrackDuration);
-        trackMap.put("average_track_popularity", averageTrackPopularity);
+        map.put("total_tracks_played", totalTracksPlayed);
+        map.put("total_unique_tracks_played", totalUniqueTracksPlayed);
+        map.put("total_listening_time", totalListeningTime);
+        map.put("total_new_tracks_played", totalNewTracksPlayed);
+        map.put("total_local_tracks_played", totalLocalTracksPlayed);
+        map.put("total_explicit_tracks_played", totalExplicitTracksPlayed);
+        map.put("average_track_duration", averageTrackDuration);
+        map.put("average_track_popularity", averageTrackPopularity);
 
-        Map<String, Object> albumMap = new HashMap<>();
-        map.put("album", albumMap);
+        return map;
+    }
+
+    private Map<String, Object> getAlbumSingleValueStats() {
+        Map<String, Object> map = new HashMap<>();
 
         int totalUniqueAlbumsPlayed = distinctAlbumData.size();
 
-        albumMap.put("total_unique_albums_played", totalUniqueAlbumsPlayed);
+        map.put("total_unique_albums_played", totalUniqueAlbumsPlayed);
 
-        Map<String, Object> artistMap = new HashMap<>();
-        map.put("artists", artistMap);
+        return map;
+    }
+
+    private Map<String, Object> getArtistSingleValueStats() {
+        Map<String, Object> map = new HashMap<>();
 
         int totalUniqueArtistsPlayed = distinctArtistData.size();
 
-        artistMap.put("total_unique_artists_played", totalUniqueArtistsPlayed);
+        map.put("total_unique_artists_played", totalUniqueArtistsPlayed);
 
-        Map<String, Object> miscMap = new HashMap<>();
-        map.put("misc", miscMap);
+        return map;
+    }
 
-        List<Session> sessions = getSessions();
+    private Map<String, Object> getMiscSingleValueStats() {
+        Map<String, Object> map = new HashMap<>();
+
+        List<Session> sessions = calculateSessions();
 
         int totalListeningSessions = sessions.size();
-        long averageListeningSessionLength = Math.round(sessions.stream().mapToLong(x -> x.end().toEpochMilli() - x.start().toEpochMilli()).average().orElse(-1));
+        long averageListeningSessionLength = Math.round(sessions.stream()
+                .mapToLong(x -> x.period().getDurationMs())
+                .average()
+                .orElse(-1));
         double averagePercentageListeningToMusicDuringSession = sessions.stream()
                 .mapToDouble(
                         x -> (double) x.playedTracks().stream()
                                 .mapToLong(y -> y.track().durationMs())
-                                .sum() / (x.end().toEpochMilli() - x.start().toEpochMilli()))
+                                .sum() / x.period().getDurationMs())
                 .average()
                 .orElse(-1);
         int listeningStreak = getListeningStreakInDays();
@@ -148,33 +165,51 @@ public class StatsService {
                 .filter(allLikedSongs::contains)
                 .count();
 
-        miscMap.put("total_listening_sessions", totalListeningSessions);
-        miscMap.put("average_listening_session_length", averageListeningSessionLength);
-        miscMap.put("average_percentage_listening_to_music_during_session", averagePercentageListeningToMusicDuringSession);
-        miscMap.put("current_listening_streak", listeningStreak);
-        miscMap.put("percentage_tracks_added_to_liked_after_play", percentageOfSongsAddedToLikedAfterPlay);
-        miscMap.put("total_new_tracks_added_to_liked", totalNewTracksAddedToLiked);
+        map.put("total_listening_sessions", totalListeningSessions);
+        map.put("average_listening_session_length", averageListeningSessionLength);
+        map.put("average_percentage_listening_to_music_during_session", averagePercentageListeningToMusicDuringSession);
+        map.put("current_listening_streak", listeningStreak);
+        map.put("percentage_tracks_added_to_liked_after_play", percentageOfSongsAddedToLikedAfterPlay);
+        map.put("total_new_tracks_added_to_liked", totalNewTracksAddedToLiked);
 
         return map;
     }
 
-    private List<Session> getSessions() {
+    public Map<String, Object> getAllSingleValueStats() {
+        Map<String, Object> map = new HashMap<>();
+
+        map.put("track", getTrackSingleValueStats());
+        map.put("album", getAlbumSingleValueStats());
+        map.put("artists", getArtistSingleValueStats());
+        map.put("misc", getMiscSingleValueStats());
+
+        return map;
+    }
+
+    private List<Session> calculateSessions() {
         if (playedTrackData.isEmpty()) return Collections.emptyList();
+
+        List<PlayedTrack> playedTracksSorted = new ArrayList<>(playedTrackData);
+        playedTracksSorted.sort(Comparator.comparing(PlayedTrack::timeFinished));
+
         List<Session> sessions = new ArrayList<>();
         List<PlayedTrack> currentSessionPlayedTracks = new ArrayList<>();
-        Instant previousSong = playedTrackData.getFirst().timeFinished();
+        Instant previousSong = playedTracksSorted.getFirst().timeFinished();
 
-        for (PlayedTrack playedTrack : playedTrackData) {
+        for (PlayedTrack playedTrack : playedTracksSorted) {
             Instant currentSong = playedTrack.timeFinished();
             if (currentSong.isAfter(previousSong.plusSeconds(MAX_LISTENING_SESSION_GAP_MINUTES * 60))) {
                 if (!currentSessionPlayedTracks.isEmpty()) {
-                    sessions.add(new Session(
-                            currentSessionPlayedTracks.getFirst().timeFinished().minusMillis(
-                                    currentSessionPlayedTracks.getFirst().track().durationMs()
-                            ),
-                            currentSessionPlayedTracks.getLast().timeFinished().plusMillis(
-                                    Math.round(currentSessionPlayedTracks.getLast().track().durationMs() * 0.35)
-                            ),
+                    PlayedTrack startingTrack = currentSessionPlayedTracks.getFirst();
+                    PlayedTrack endingTrack =  currentSessionPlayedTracks.getLast();
+                    sessions.add(new Session( new InstantTimeRange(
+                            startingTrack.timeFinished().minusMillis(
+                                        Math.round(startingTrack.track().durationMs() * 0.65)
+                                ),
+                            endingTrack.timeFinished().plusMillis(
+                                        Math.round(endingTrack.track().durationMs() * 0.25)
+                                )
+                    ),
                             new ArrayList<>(currentSessionPlayedTracks)));
                     currentSessionPlayedTracks.clear();
                 }
@@ -184,20 +219,14 @@ public class StatsService {
         }
 
         if (!currentSessionPlayedTracks.isEmpty()) {
-            sessions.add(new Session(
+            sessions.add(new Session( new InstantTimeRange(
                     currentSessionPlayedTracks.getFirst().timeFinished(),
-                    currentSessionPlayedTracks.getLast().timeFinished(),
+                    currentSessionPlayedTracks.getLast().timeFinished()
+            ),
+
                     currentSessionPlayedTracks
             ));
         }
-
-        /*for (Session session : sessions) {
-            String message = "Total session length: " + (session.end().toEpochMilli() - session.start().toEpochMilli());
-            for (PlayedTrack playedTrack : session.playedTracks()) {
-                message += ", " + playedTrack.track().name() + " - " + playedTrack.track().durationMs();
-            }
-            System.out.println(message);
-        }*/
 
         return sessions;
     }
@@ -238,31 +267,31 @@ public class StatsService {
     }
 
     public Map<String, Object> getLongestListeningSession() {
-        return getSessions().stream()
-                .max(Comparator.comparingLong(x -> x.end().toEpochMilli() - x.start().toEpochMilli()))
+        return calculateSessions().stream()
+                .max(Comparator.comparingLong(x -> x.period().getDurationMs()))
                 .map(Session::toMap)
                 .orElse(null);
 
     }
 
-    private List<TimeRange> generateTimeBlocks() {
-        List<TimeRange> timeBlocks = new ArrayList<>();
+    private List<LocalTimeRange> generateTimeBlocks() {
+        List<LocalTimeRange> timeBlocks = new ArrayList<>();
         for (int i = 1; i < 1 + (60 / TIME_BLOCK_LENGTH_MINUTES) * 24; i++) {
             LocalTime startTime = LocalTime.MIDNIGHT.plusMinutes(TIME_BLOCK_LENGTH_MINUTES * (i - 1));
             LocalTime endTime = LocalTime.MIDNIGHT.plusMinutes(TIME_BLOCK_LENGTH_MINUTES * i);
-            timeBlocks.add(new TimeRange(startTime, endTime));
+            timeBlocks.add(new LocalTimeRange(startTime, endTime));
         }
         return timeBlocks;
     }
 
     public Map<String, Object> getListeningTimeHeatMap() {
-        List<TimeRange> timeBlocks = generateTimeBlocks();
+        List<LocalTimeRange> timeBlocks = generateTimeBlocks();
         List<Map<String, Object>> heatMap = new ArrayList<>();
         Map<String, Object> map = new HashMap<>();
         map.put("heat_map", heatMap);
         ZoneId aus = ZoneId.of("Australia/Sydney");
 
-        for (TimeRange timeBlock : timeBlocks) {
+        for (LocalTimeRange timeBlock : timeBlocks) {
             var timeBlockMap = timeBlock.toMap();
             List<PlayedTrack> timeBlockPlayedTracks = playedTrackData.stream()
                     .filter(x -> timeBlock.isWithin(LocalTime.ofInstant(x.timeFinished(), aus)))
@@ -299,10 +328,12 @@ public class StatsService {
                             .filter(pt -> pt.track().artists().contains(artist))
                             .count();
                     map.put("play_count", playCount);
-                    map.put("percentage_of_tracks", playCount /  totalPlays);
+                    map.put("percentage_of_tracks", (double) playCount /  totalPlays);
                     return map;
                 })
-                .toList();
+                .sorted(Comparator.comparingDouble(x -> (double) x.get("percentage_of_tracks")))
+                .toList()
+                .reversed();
     }
 
     public Map<String, Object> getMostNicheArtist() {
@@ -336,4 +367,13 @@ public class StatsService {
                 .map(Artist::toMap)
                 .orElse(null);
     }
+
+    public List<Map<String, Object>> getRecentlyPlayedTracks(Integer limit) {
+        return playedTrackData.stream()
+                .limit(limit)
+                .map(PlayedTrack::toMap)
+                .toList();
+    }
+
+
 }

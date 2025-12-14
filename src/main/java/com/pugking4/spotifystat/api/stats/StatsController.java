@@ -1,7 +1,6 @@
 package com.[REDACTED].spotifystat.api.stats;
 
-import com.[REDACTED].spotifystat.api.data.DatabaseWrapper;
-import com.[REDACTED].spotifystat.api.data.Pair;
+import com.[REDACTED].spotifystat.api.data.TrackRepository;
 import com.[REDACTED].spotifystat.common.dto.PlayedTrack;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,15 +9,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 class StatsController {
+
+    private final TrackRepository trackRepository;
+
+    public StatsController(TrackRepository trackRepository) {
+        this.trackRepository = trackRepository;
+    }
 
     @RequestMapping("/")
     public Map<String, Object> home() {
@@ -94,57 +96,66 @@ class StatsController {
 
     @GetMapping("/stats/time/calendar/today")
     public Map<String, Object> today() {
-        return getTimeStats(getTrackingPeriod(Calendar.THIS_DAY));
+        return getTimeStats(Calendar.THIS_DAY);
     }
 
     @GetMapping("/stats/time/calendar/day")
     public Map<String, Object> day(@RequestParam(required = false) Integer daysBack) {
-        return getTimeStats(getTrackingPeriod(Calendar.DAY));
+        return getTimeStats(Calendar.DAY);
     }
 
     @GetMapping("/stats/time/calendar/this-week")
     public Map<String, Object> thisWeek() {
-        return getTimeStats(getTrackingPeriod(Calendar.THIS_WEEK));
+        return getTimeStats(Calendar.THIS_WEEK);
     }
 
     @GetMapping("/stats/time/calendar/week")
     public Map<String, Object> week(@RequestParam(required = false) Integer weeksBack) {
-        return getTimeStats(getTrackingPeriod(Calendar.WEEK));
+        return getTimeStats(Calendar.WEEK);
     }
 
     @GetMapping("/stats/time/calendar/this-month")
     public Map<String, Object> thisMonth() {
-        return getTimeStats(getTrackingPeriod(Calendar.THIS_MONTH));
+        return getTimeStats(Calendar.THIS_MONTH);
     }
 
     @GetMapping("/stats/time/calendar/month")
     public Map<String, Object> month(@RequestParam(required = false) Integer monthsBack) {
-        return getTimeStats(getTrackingPeriod(Calendar.MONTH));
+        return getTimeStats(Calendar.MONTH);
     }
 
     @GetMapping("/stats/time/calendar/this-year")
     public Map<String, Object> thisYear() {
-        return getTimeStats(getTrackingPeriod(Calendar.THIS_YEAR));
+        return getTimeStats(Calendar.THIS_YEAR);
     }
 
     @GetMapping("/stats/time/calendar/year")
     public Map<String, Object> year(@RequestParam(required = false) Integer yearsBack) {
-        return getTimeStats(getTrackingPeriod(Calendar.YEAR));
+        return getTimeStats(Calendar.YEAR);
     }
 
     @GetMapping("/stats/time/rolling")
     public ResponseEntity<Map<String, Object>> rolling(@RequestParam Integer endHours, @RequestParam(required = false) Integer startHours) {
         if (endHours < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        var stats = getTimeStats(getTrackingPeriod(endHours));
+        var stats = getTimeStats(endHours);
         return new ResponseEntity<>(stats, HttpStatus.OK);
     }
 
-    private static Map<String, Object> getTimeStats(Pair<LocalDateTime, LocalDateTime> trackingPeriod) {
-        List<PlayedTrack> trackData = DatabaseWrapper.collectAllData(trackingPeriod);
-        StatsService service = new StatsService(trackData);
+    private Map<String, Object> getTimeStats(Calendar period) {
+
+        return getTimeStats(trackRepository.findByPeriod(period));
+    }
+
+    private Map<String, Object> getTimeStats(int hours) {
+        return getTimeStats(trackRepository.findByHours(hours));
+    }
+
+    private Map<String, Object> getTimeStats(List<PlayedTrack> playedTracks) {
+        List<PlayedTrack> allTimeData = trackRepository.findAll();
+        StatsService service = new StatsService(playedTracks, allTimeData);
         Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", service.getTopTracks());
-        stats.put("single_value_stats", service.getSingleValueStats());
+        stats.put("top_tracks", service.getTopFiveTracks());
+        stats.put("single_value_stats", service.getAllSingleValueStats());
         stats.put("longest_track", service.getLongestTrack());
         stats.put("shortest_track", service.getShortestTrack());
         stats.put("longest_listening_session", service.getLongestListeningSession());
@@ -155,21 +166,11 @@ class StatsController {
         return stats;
     }
 
-    private static Pair<LocalDateTime, LocalDateTime> getTrackingPeriod(Calendar mode) {
-        return switch(mode) {
-            case THIS_DAY -> new Pair<>(LocalDateTime.now(), LocalDate.now().atStartOfDay());
-            case THIS_WEEK -> new Pair<>(LocalDateTime.now(), LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay());
-            case THIS_MONTH -> new Pair<>(LocalDateTime.now(), LocalDate.now().withDayOfMonth(1).atStartOfDay());
-            case THIS_YEAR -> new Pair<>(LocalDateTime.now(), LocalDate.now().withDayOfYear(1).atStartOfDay());
-            case DAY -> new Pair<>(LocalDate.now().atStartOfDay(), LocalDate.now().minusDays(1).atStartOfDay());
-            case WEEK -> new Pair<>(LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay(), LocalDate.now().minusWeeks(1).with(java.time.DayOfWeek.MONDAY).atStartOfDay());
-            case MONTH -> new Pair<>(LocalDate.now().withDayOfMonth(1).atStartOfDay(), LocalDate.now().minusMonths(1).withDayOfMonth(1).atStartOfDay());
-            case YEAR -> new Pair<>(LocalDate.now().withDayOfYear(1).atStartOfDay(), LocalDate.now().minusYears(1).withDayOfYear(1).atStartOfDay());
-        };
+    @GetMapping("/stats/recentlyPlayed")
+    public ResponseEntity<List<Map<String, Object>>> recentlyPlayed(@RequestParam Integer limit) {
+        if (limit < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(trackRepository.getRecentlyPlayedTracks(limit).stream()
+                .map(PlayedTrack::toMap)
+                .toList(), HttpStatus.OK);
     }
-
-    private static Pair<LocalDateTime, LocalDateTime> getTrackingPeriod(int hours) {
-        return new Pair<>(LocalDateTime.now(), LocalDateTime.now().minusHours(hours));
-    }
-
 }
