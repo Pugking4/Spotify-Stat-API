@@ -6,3 +6,6 @@ management:
     web:
       exposure:
         include: mappings
+database:
+  username: replace_with_db_username
+  password: replace_with_db_password

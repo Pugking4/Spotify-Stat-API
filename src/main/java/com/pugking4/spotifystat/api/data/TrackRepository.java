@@ -4,6 +4,8 @@ import java.sql.*;
 import com.[REDACTED].spotifystat.api.stats.Calendar;
 import com.[REDACTED].spotifystat.api.stats.TimeUtility;
 import com.[REDACTED].spotifystat.common.dto.*;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.time.*;
@@ -11,19 +13,29 @@ import java.util.*;
 
 @Repository
 public class TrackRepository {
-    private final static Connection db;
+    private final Connection db;
     private final static String url = "jdbc:postgresql://localhost:5433/track-database";
-    private final static String username = "[REDACTED]";
-    private final static String [REDACTED];
+    @Value("${database.username}")
+    private String username;
+    @Value("${database.password}")
+    private String password;
 
-    static {
+    public TrackRepository() {
+        if (username == null) {
+            throw new IllegalStateException("Username not injected yet - Spring context not ready");
+        }
+
+        if (password == null) {
+            throw new IllegalStateException("Password not injected yet - Spring context not ready");
+        }
+
         try {
             Properties props = new Properties();
             props.setProperty("user", username);
             props.setProperty("password", password);
             db = DriverManager.getConnection(url, props);
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Database initialization failed", e);
         }
     }
 
