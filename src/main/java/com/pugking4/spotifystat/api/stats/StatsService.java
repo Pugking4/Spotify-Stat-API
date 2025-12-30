@@ -16,7 +16,8 @@ public class StatsService {
     private final Set<Track> distinctTrackData;
     private final Set<Album> distinctAlbumData;
     private final Set<Artist> distinctArtistData; //flat
-    private final String EXCLUDE_ARTIST = "0LyfQWJT6nXafLPZqxe9Of";
+    private final String EXCLUDE_ARTIST = "0LyfQWJT6nXafLPZqxe9Of"; // excludes "Various Artists" artist
+    private final int MINIMUM_DAYS_SINCE_RELEASE_POPULARITY = 5;
 
     private final int MAX_LISTENING_SESSION_GAP_MINUTES = 15;
     private final int TIME_BLOCK_LENGTH_MINUTES = 15; // must be a factor of 60
@@ -89,6 +90,7 @@ public class StatsService {
                 .average()
                 .orElse(-1));
         double averageTrackPopularity = playedTrackData.stream()
+                .filter(this::filterRecentTrack)
                 .mapToInt(PlayedTrack::currentPopularity)
                 .average()
                 .orElse(-1);
@@ -103,6 +105,13 @@ public class StatsService {
         map.put("average_track_popularity", averageTrackPopularity);
 
         return map;
+    }
+
+
+    boolean filterRecentTrack(PlayedTrack track) {
+        LocalDate release = track.track().album().releaseDate();
+        LocalDate threshold = LocalDate.now().minusDays(MINIMUM_DAYS_SINCE_RELEASE_POPULARITY);
+        return !release.isAfter(threshold);
     }
 
     private Map<String, Object> getAlbumSingleValueStats() {
@@ -373,6 +382,14 @@ public class StatsService {
                 .limit(limit)
                 .map(PlayedTrack::toMap)
                 .toList();
+    }
+
+    public Map<String, Object> getMostNicheTrack() {
+        return playedTrackData.stream()
+                .filter(this::filterRecentTrack)
+                .min(Comparator.comparingInt(PlayedTrack::currentPopularity))
+                .map(PlayedTrack::toMap)
+                .orElse(null);
     }
 
 

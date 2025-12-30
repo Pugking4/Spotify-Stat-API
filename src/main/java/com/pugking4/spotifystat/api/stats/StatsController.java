@@ -26,7 +26,7 @@ class StatsController {
     public Map<String, Object> home() {
         Map<String, Object> info = new HashMap<>();
         info.put("message", "Welcome to Spotify Tracker API, this API retrieves various stats from my listening history.");
-        info.put("version", "1.0");
+        info.put("version", "0.1.0");
 
         /*String[] endpoints = new String[] {"/stats/api", "/stats/time/rolling?hours=",
                 "/stats/time/calendar/complete/daily", "/stats/time/calendar/complete/weekly", "/stats/time/calendar/complete/monthly",
@@ -81,6 +81,7 @@ class StatsController {
             ☩ most common era of release date
             ☩ most common year of release date
             ☩ distribution of album type
+            ☩ most common exact date of release
 
         collection:
             ☩ context type distribution
@@ -92,6 +93,12 @@ class StatsController {
 
         //info.put("endpoints", endpoints);
         return info;
+
+        /*
+        All-Time specific
+        ☩ greatest rise in pop (exclude tracks at pop 0)
+
+         */
     }
 
     @GetMapping("/stats/time/calendar/today")

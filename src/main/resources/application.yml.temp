@@ -1,0 +1,8 @@
+server:
+  address: replace_with_local_ip
+  port: repace_with_port
+management:
+  endpoints:
+    web:
+      exposure:
+        include: mappings
