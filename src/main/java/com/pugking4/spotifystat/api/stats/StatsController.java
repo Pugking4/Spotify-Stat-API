@@ -173,7 +173,7 @@ class StatsController {
         return stats;
     }
 
-    @GetMapping("/stats/recentlyPlayed")
+    @GetMapping("/stats/recently-played")
     public ResponseEntity<List<Map<String, Object>>> recentlyPlayed(@RequestParam Integer limit) {
         if (limit < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         return new ResponseEntity<>(trackRepository.getRecentlyPlayedTracks(limit).stream()
