@@ -1,5 +1,5 @@
-import com.[REDACTED].spotifystat.api.stats.StatsService;
-import com.[REDACTED].spotifystat.common.dto.*;
+import com.pugking4.spotifystat.api.stats.StatsService;
+import com.pugking4.spotifystat.common.dto.*;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
