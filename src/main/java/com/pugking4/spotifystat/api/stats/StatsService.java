@@ -1,6 +1,6 @@
-package com.[REDACTED].spotifystat.api.stats;
+package com.pugking4.spotifystat.api.stats;
 
-import com.[REDACTED].spotifystat.common.dto.*;
+import com.pugking4.spotifystat.common.dto.*;
 
 import java.time.*;
 import java.util.*;

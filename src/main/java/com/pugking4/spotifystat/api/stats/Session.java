@@ -1,7 +1,7 @@
-package com.[REDACTED].spotifystat.api.stats;
+package com.pugking4.spotifystat.api.stats;
 
-import com.[REDACTED].spotifystat.common.dto.InstantTimeRange;
-import com.[REDACTED].spotifystat.common.dto.PlayedTrack;
+import com.pugking4.spotifystat.common.dto.InstantTimeRange;
+import com.pugking4.spotifystat.common.dto.PlayedTrack;
 
 import java.util.ArrayList;
 import java.util.HashMap;

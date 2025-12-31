@@ -1,4 +1,4 @@
-package com.[REDACTED].spotifystat.api;
+package com.pugking4.spotifystat.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

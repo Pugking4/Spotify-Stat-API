@@ -1,6 +1,6 @@
-package com.[REDACTED].spotifystat.api.stats;
+package com.pugking4.spotifystat.api.stats;
 
-import com.[REDACTED].spotifystat.api.data.Pair;
+import com.pugking4.spotifystat.api.data.Pair;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
