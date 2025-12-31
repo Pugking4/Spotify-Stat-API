@@ -13,22 +13,18 @@ import java.util.*;
 
 @Repository
 public class TrackRepository {
-    private final Connection db;
+    private Connection db;
     private final static String url = "jdbc:postgresql://localhost:5433/track-database";
     @Value("${database.username}")
     private String username;
     @Value("${database.password}")
     private String password;
 
-    public TrackRepository() {
-        if (username == null) {
-            throw new IllegalStateException("Username not injected yet - Spring context not ready");
+    @PostConstruct
+    private void init() {
+        if (username == null || password == null) {
+            throw new IllegalStateException("Database credentials not configured");
         }
-
-        if (password == null) {
-            throw new IllegalStateException("Password not injected yet - Spring context not ready");
-        }
-
         try {
             Properties props = new Properties();
             props.setProperty("user", username);
