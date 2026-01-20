@@ -17,9 +17,11 @@ import java.util.Map;
 class StatsController {
 
     private final TrackRepository trackRepository;
+    private final APIStatsService apiStatsService;
 
-    public StatsController(TrackRepository trackRepository) {
+    public StatsController(TrackRepository trackRepository, APIStatsService apiStatsService) {
         this.trackRepository = trackRepository;
+        this.apiStatsService = apiStatsService;
     }
 
     @RequestMapping("/")
@@ -179,5 +181,16 @@ class StatsController {
         return new ResponseEntity<>(trackRepository.getRecentlyPlayedTracks(limit).stream()
                 .map(PlayedTrack::toMap)
                 .toList(), HttpStatus.OK);
+    }
+
+    @GetMapping("/stats/api")
+    public Map<String, Object> api() {
+        Map<String, Object> stats = new HashMap<>();
+
+        stats.put("uptime_s", apiStatsService.getUptimeSeconds());
+        stats.put("requests", apiStatsService.getTotalRequests());
+        stats.put("version", apiStatsService.getVersion());
+        stats.put("hostname", apiStatsService.getHostName());
+        return stats;
     }
 }
