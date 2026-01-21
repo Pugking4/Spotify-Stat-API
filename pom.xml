@@ -6,7 +6,7 @@
 
     <groupId>com.pugking4.spotifystat.api</groupId>
     <artifactId>Spotify-Stat-API</artifactId>
-    <version>0.1.3</version>
+    <version>0.1.4</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>

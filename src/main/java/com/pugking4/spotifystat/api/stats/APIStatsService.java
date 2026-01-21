@@ -26,6 +26,7 @@ public class APIStatsService {
     public long getTotalRequests() {
         return registry.find("http.server.requests")
                 .timers().stream()
+                .filter(t -> !"/stats/api".equals(t.getId().getTag("uri")))
                 .mapToLong(Timer::count)
                 .sum();
     }
