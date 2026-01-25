@@ -6,7 +6,7 @@
 
     <groupId>com.pugking4.spotifystat.api</groupId>
     <artifactId>Spotify-Stat-API</artifactId>
-    <version>0.1.4</version>
+    <version>0.2.0</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -51,6 +51,13 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>2.0.17</version>
+        </dependency>
+        <!-- Source: https://mvnrepository.com/artifact/io.micrometer/micrometer-registry-prometheus -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>1.16.2</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
     <build>

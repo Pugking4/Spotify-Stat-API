@@ -5,9 +5,9 @@ import com.pugking4.spotifystat.common.dto.PlayedTrack;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +28,6 @@ class StatsController {
     public Map<String, Object> home() {
         Map<String, Object> info = new HashMap<>();
         info.put("message", "Welcome to Spotify Tracker API, this API retrieves various stats from my listening history.");
-        info.put("version", "0.1.2");
 
         /*String[] endpoints = new String[] {"/stats/api", "/stats/time/rolling?hours=",
                 "/stats/time/calendar/complete/daily", "/stats/time/calendar/complete/weekly", "/stats/time/calendar/complete/monthly",
@@ -104,93 +103,94 @@ class StatsController {
     }
 
     @GetMapping("/stats/time/calendar/today")
-    public Map<String, Object> today() {
+    public ResponseEntity<TimePeriodStatsResponse> today() {
         return getTimeStats(Calendar.THIS_DAY);
     }
 
     @GetMapping("/stats/time/calendar/day")
-    public Map<String, Object> day(@RequestParam(required = false) Integer daysBack) {
+    public ResponseEntity<TimePeriodStatsResponse> day(@RequestParam(required = false) Integer daysBack) {
         return getTimeStats(Calendar.DAY);
     }
 
     @GetMapping("/stats/time/calendar/this-week")
-    public Map<String, Object> thisWeek() {
+    public ResponseEntity<TimePeriodStatsResponse> thisWeek() {
         return getTimeStats(Calendar.THIS_WEEK);
     }
 
     @GetMapping("/stats/time/calendar/week")
-    public Map<String, Object> week(@RequestParam(required = false) Integer weeksBack) {
+    public ResponseEntity<TimePeriodStatsResponse> week(@RequestParam(required = false) Integer weeksBack) {
         return getTimeStats(Calendar.WEEK);
     }
 
     @GetMapping("/stats/time/calendar/this-month")
-    public Map<String, Object> thisMonth() {
+    public ResponseEntity<TimePeriodStatsResponse> thisMonth() {
         return getTimeStats(Calendar.THIS_MONTH);
     }
 
     @GetMapping("/stats/time/calendar/month")
-    public Map<String, Object> month(@RequestParam(required = false) Integer monthsBack) {
+    public ResponseEntity<TimePeriodStatsResponse> month(@RequestParam(required = false) Integer monthsBack) {
         return getTimeStats(Calendar.MONTH);
     }
 
     @GetMapping("/stats/time/calendar/this-year")
-    public Map<String, Object> thisYear() {
+    public ResponseEntity<TimePeriodStatsResponse> thisYear() {
         return getTimeStats(Calendar.THIS_YEAR);
     }
 
     @GetMapping("/stats/time/calendar/year")
-    public Map<String, Object> year(@RequestParam(required = false) Integer yearsBack) {
+    public ResponseEntity<TimePeriodStatsResponse> year(@RequestParam(required = false) Integer yearsBack) {
         return getTimeStats(Calendar.YEAR);
     }
 
     @GetMapping("/stats/time/rolling")
-    public ResponseEntity<Map<String, Object>> rolling(@RequestParam Integer endHours, @RequestParam(required = false) Integer startHours) {
+    public ResponseEntity<TimePeriodStatsResponse> rolling(@RequestParam Integer endHours, @RequestParam(required = false) Integer startHours) {
         if (endHours < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        var stats = getTimeStats(endHours);
-        return new ResponseEntity<>(stats, HttpStatus.OK);
+        return new ResponseEntity<>(getTimeStats(endHours), HttpStatus.OK);
     }
 
-    private Map<String, Object> getTimeStats(Calendar period) {
-
-        return getTimeStats(trackRepository.findByPeriod(period));
+    private ResponseEntity<TimePeriodStatsResponse> getTimeStats(Calendar period) {
+        return new ResponseEntity<>(getTimeStats(trackRepository.findByPeriod(period)), HttpStatus.OK);
     }
 
-    private Map<String, Object> getTimeStats(int hours) {
+    private TimePeriodStatsResponse getTimeStats(int hours) {
         return getTimeStats(trackRepository.findByHours(hours));
     }
 
-    private Map<String, Object> getTimeStats(List<PlayedTrack> playedTracks) {
+    private TimePeriodStatsResponse getTimeStats(List<PlayedTrack> playedTracks) {
         List<PlayedTrack> allTimeData = trackRepository.findAll();
         StatsService service = new StatsService(playedTracks, allTimeData);
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("top_tracks", service.getTopFiveTracks());
-        stats.put("single_value_stats", service.getAllSingleValueStats());
-        stats.put("longest_track", service.getLongestTrack());
-        stats.put("shortest_track", service.getShortestTrack());
-        stats.put("longest_listening_session", service.getLongestListeningSession());
-        stats.put("listening_time_heatmap", service.getListeningTimeHeatMap());
-        stats.put("artist_distribution", service.getArtistDistribution());
-        stats.put("most_niche_artist", service.getMostNicheArtist());
-        stats.put("most_popular_artist", service.getMostPopularArtist());
-        return stats;
+
+        return new TimePeriodStatsResponse(
+                service.getTopFiveTracks(),
+                service.getAllSingleValueStats(),
+                service.getLongestTrack(),
+                service.getShortestTrack(),
+                service.getLongestListeningSession(),
+                service.getListeningTimeHeatMap(),
+                service.getArtistDistribution(),
+                service.getMostNicheArtist(),
+                service.getMostPopularArtist()
+        );
     }
 
     @GetMapping("/stats/recently-played")
-    public ResponseEntity<List<Map<String, Object>>> recentlyPlayed(@RequestParam Integer limit) {
+    public ResponseEntity<List<PlayedTrack>> recentlyPlayed(@RequestParam Integer limit) {
         if (limit < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        return new ResponseEntity<>(trackRepository.getRecentlyPlayedTracks(limit).stream()
-                .map(PlayedTrack::toMap)
-                .toList(), HttpStatus.OK);
+        return new ResponseEntity<>(trackRepository.getRecentlyPlayedTracks(limit), HttpStatus.OK);
     }
 
     @GetMapping("/stats/api")
-    public Map<String, Object> api() {
-        Map<String, Object> stats = new HashMap<>();
-
-        stats.put("uptime_s", apiStatsService.getUptimeSeconds());
-        stats.put("requests", apiStatsService.getTotalRequests());
-        stats.put("version", apiStatsService.getVersion());
-        stats.put("hostname", apiStatsService.getHostName());
-        return stats;
+    public ApiStatsResponse api() {
+        return new ApiStatsResponse(
+                apiStatsService.getUptimeSeconds(),
+                apiStatsService.getTotalRequests(),
+                apiStatsService.getVersion(),
+                apiStatsService.getHostName(),
+                apiStatsService.getRequestsPerMinutes(1),
+                apiStatsService.getRequestsPerMinutes(5),
+                apiStatsService.getLatencyPercentilesMs("", 1),
+                apiStatsService.getLatencyPercentilesMs("", 5),
+                apiStatsService.getUptimePercentage()
+        );
     }
 }
