@@ -369,11 +369,5 @@ public class StatsComputation {
                 .min(Comparator.comparingInt(PlayedTrack::currentPopularity))
                 .orElse(null);
     }
-
-    public PlayedTrack findMostPopularTrack() {
-        return recentlyReleasedTracks.stream()
-                .max(Comparator.comparingInt(PlayedTrack::currentPopularity))
-                .orElse(null);
-    }
 }
 
