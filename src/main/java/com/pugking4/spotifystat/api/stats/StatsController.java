@@ -2,6 +2,9 @@ package com.pugking4.spotifystat.api.stats;
 
 import com.pugking4.spotifystat.api.data.TrackRepository;
 import com.pugking4.spotifystat.common.dto.PlayedTrack;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,12 +31,6 @@ class StatsController {
     public Map<String, Object> home() {
         Map<String, Object> info = new HashMap<>();
         info.put("message", "Welcome to Spotify Tracker API, this API retrieves various stats from my listening history.");
-
-        /*String[] endpoints = new String[] {"/stats/api", "/stats/time/rolling?hours=",
-                "/stats/time/calendar/complete/daily", "/stats/time/calendar/complete/weekly", "/stats/time/calendar/complete/monthly",
-                "/stats/time/calendar/complete/yearly", "/stats/time/calendar/incomplete/daily", "/stats/time/calendar/incomplete/weekly", "/stats/time/calendar/incomplete/monthly",
-                "/stats/time/calendar/incomplete/yearly", "/stats/time/all-time", "/stats/artist?name=", "/stats/genre?name=",
-                "/stats/album?name=", "/stats/track?name=?artist=", "/stats/devices?name=", "/stats/context?type="};*/
         /*
         api stats:
             running time
@@ -63,7 +60,7 @@ class StatsController {
             ○ how often new songs are played from liked collection and how many (in one day, played for first time in liked collection NOT PLAYLIST)
             !☩ top days of week, top week of months, top month of years (depends on calendar mode/rolling length)
             !☩ track distribution (might not be great, dont really listen on repeat very often)
-            ☩ get most niche track (atleast 1 month old as new tracks are 0 pop by default)
+            ☩ get most niche track (at least 1 month old as new tracks are 0 pop by default)
             ☩ get most popular track
 
 
@@ -97,85 +94,39 @@ class StatsController {
 
         /*
         All-Time specific
-        ☩ greatest rise in pop (exclude tracks at pop 0)
+        ☩ the greatest rise in pop (exclude tracks at pop 0)
 
          */
     }
 
-    @GetMapping("/stats/time/calendar/today")
-    public ResponseEntity<TimePeriodStatsResponse> today() {
-        return getTimeStats(Calendar.THIS_DAY);
-    }
-
-    @GetMapping("/stats/time/calendar/day")
-    public ResponseEntity<TimePeriodStatsResponse> day(@RequestParam(required = false) Integer daysBack) {
-        return getTimeStats(Calendar.DAY);
-    }
-
-    @GetMapping("/stats/time/calendar/this-week")
-    public ResponseEntity<TimePeriodStatsResponse> thisWeek() {
-        return getTimeStats(Calendar.THIS_WEEK);
-    }
-
-    @GetMapping("/stats/time/calendar/week")
-    public ResponseEntity<TimePeriodStatsResponse> week(@RequestParam(required = false) Integer weeksBack) {
-        return getTimeStats(Calendar.WEEK);
-    }
-
-    @GetMapping("/stats/time/calendar/this-month")
-    public ResponseEntity<TimePeriodStatsResponse> thisMonth() {
-        return getTimeStats(Calendar.THIS_MONTH);
-    }
-
-    @GetMapping("/stats/time/calendar/month")
-    public ResponseEntity<TimePeriodStatsResponse> month(@RequestParam(required = false) Integer monthsBack) {
-        return getTimeStats(Calendar.MONTH);
-    }
-
-    @GetMapping("/stats/time/calendar/this-year")
-    public ResponseEntity<TimePeriodStatsResponse> thisYear() {
-        return getTimeStats(Calendar.THIS_YEAR);
-    }
-
-    @GetMapping("/stats/time/calendar/year")
-    public ResponseEntity<TimePeriodStatsResponse> year(@RequestParam(required = false) Integer yearsBack) {
-        return getTimeStats(Calendar.YEAR);
-    }
-
-    @GetMapping("/stats/time/rolling")
-    public ResponseEntity<TimePeriodStatsResponse> rolling(@RequestParam Integer endHours, @RequestParam(required = false) Integer startHours) {
-        if (endHours < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        return new ResponseEntity<>(getTimeStats(endHours), HttpStatus.OK);
-    }
-
-    private ResponseEntity<TimePeriodStatsResponse> getTimeStats(Calendar period) {
-        return new ResponseEntity<>(getTimeStats(trackRepository.findByPeriod(period)), HttpStatus.OK);
-    }
-
-    private TimePeriodStatsResponse getTimeStats(int hours) {
-        return getTimeStats(trackRepository.findByHours(hours));
+    @GetMapping("/stats/time")
+    public ResponseEntity<TimePeriodStatsResponse> timeStats(@Valid TimeStatsRequest timeStatsRequest) {
+        if (timeStatsRequest.mode() == TimeMode.CALENDAR) {
+            return new ResponseEntity<>(getTimeStats(trackRepository.findByPeriod(timeStatsRequest.period(), timeStatsRequest.offset())), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(getTimeStats(trackRepository.findByHours(timeStatsRequest.hours(), timeStatsRequest.offset())), HttpStatus.OK);
+        }
     }
 
     private TimePeriodStatsResponse getTimeStats(List<PlayedTrack> playedTracks) {
         List<PlayedTrack> allTimeData = trackRepository.findAll();
-        StatsService service = new StatsService(playedTracks, allTimeData);
+        StatsComputation service = new StatsComputation(playedTracks, allTimeData);
 
         return new TimePeriodStatsResponse(
-                service.getTopFiveTracks(),
-                service.getAllSingleValueStats(),
-                service.getLongestTrack(),
-                service.getShortestTrack(),
-                service.getLongestListeningSession(),
-                service.getListeningTimeHeatMap(),
-                service.getArtistDistribution(),
-                service.getMostNicheArtist(),
-                service.getMostPopularArtist()
+                service.topTracks(5),
+                service.calculateAllSingleValueStats(),
+                service.findLongestTrack(),
+                service.findShortestTrack(),
+                service.findLongestListeningSession(),
+                service.calculateListeningTimeHeatmap(),
+                service.calculateArtistDistribution(),
+                service.findMostNicheArtist(),
+                service.findMostPopularArtist()
         );
     }
 
     @GetMapping("/stats/recently-played")
-    public ResponseEntity<List<PlayedTrack>> recentlyPlayed(@RequestParam Integer limit) {
-        if (limit < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+    public ResponseEntity<List<PlayedTrack>> recentlyPlayed(@RequestParam @Min(1) @NonNull Integer limit) {
         return new ResponseEntity<>(trackRepository.getRecentlyPlayedTracks(limit), HttpStatus.OK);
     }
 

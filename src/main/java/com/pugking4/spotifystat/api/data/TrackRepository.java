@@ -112,13 +112,13 @@ public class TrackRepository {
         return findInPeriod(null, limit);
     }
 
-    public List<PlayedTrack> findByPeriod(Calendar period) {
-        Pair<LocalDateTime, LocalDateTime> trackingPeriod = TimeUtility.getTrackingPeriod(period);
+    public List<PlayedTrack> findByPeriod(Calendar period, int offset) {
+        Pair<LocalDateTime, LocalDateTime> trackingPeriod = TimeUtility.getTrackingPeriod(period, offset);
         return findInPeriod(trackingPeriod);
     }
 
-    public List<PlayedTrack> findByHours(int hours) {
-        Pair<LocalDateTime, LocalDateTime> trackingPeriod = TimeUtility.getTrackingPeriod(hours);
+    public List<PlayedTrack> findByHours(int hours, int offset) {
+        Pair<LocalDateTime, LocalDateTime> trackingPeriod = TimeUtility.getTrackingPeriod(hours, offset);
         return findInPeriod(trackingPeriod);
     }
 

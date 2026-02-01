@@ -1,4 +1,4 @@
-import com.pugking4.spotifystat.api.stats.StatsService;
+import com.pugking4.spotifystat.api.stats.StatsComputation;
 import com.pugking4.spotifystat.common.dto.*;
 import org.junit.jupiter.api.Test;
 
@@ -99,8 +99,8 @@ public class StatsServiceTests {
     @Test
     public void returns_top_five_tracks_under_normal_data_state() {
         List<PlayedTrack> testData = createNormalTestingData(Instant.now());
-        StatsService statsService = new StatsService(testData, testData);
-        List<Map<String, Object>> results = statsService.getTopFiveTracks();
+        StatsComputation statsComputation = new StatsComputation(testData, testData);
+        List<Map<String, Object>> results = statsComputation.getTopFiveTracks();
 
         var trackData = createNormalTrackData();
 
@@ -116,8 +116,8 @@ public class StatsServiceTests {
     @Test
     public void returns_empty_top_five_tracks_under_empty_data_state() {
         List<PlayedTrack> testData = createNormalTestingData(Instant.now());
-        StatsService statsService = new StatsService(List.of(), testData);
-        List<Map<String, Object>> results = statsService.getTopFiveTracks();
+        StatsComputation statsComputation = new StatsComputation(List.of(), testData);
+        List<Map<String, Object>> results = statsComputation.getTopFiveTracks();
 
         assertEquals(0, results.size());
     }
@@ -190,8 +190,8 @@ public class StatsServiceTests {
         List<PlayedTrack> testData = createLargeTestingData();
         var tracks = createNormalTrackData();
 
-        StatsService statsService = new StatsService(testData, testData);
-        List<Map<String, Object>> results = statsService.getTopFiveTracks();
+        StatsComputation statsComputation = new StatsComputation(testData, testData);
+        List<Map<String, Object>> results = statsComputation.getTopFiveTracks();
 
         assertEquals(5, results.size());
         assertEquals(tracks.get(0).id(), results.get(0).get("id"));
@@ -208,8 +208,8 @@ public class StatsServiceTests {
         List<PlayedTrack> testData = createLargeTestingData();
         var tracks = createNormalTrackData();
 
-        StatsService statsService = new StatsService(List.of(), testData);
-        List<Map<String, Object>> results = statsService.getTopFiveTracks();
+        StatsComputation statsComputation = new StatsComputation(List.of(), testData);
+        List<Map<String, Object>> results = statsComputation.getTopFiveTracks();
 
         assertEquals(0, results.size());
     }
