@@ -356,23 +356,15 @@ public class StatsComputation {
                 .orElse(null);
     }
 
-    public List<Map<String, Object>> getRecentlyPlayedTracks(Integer limit) {
-        return periodPlayedTracks.stream()
-                .sorted(Comparator.comparing(PlayedTrack::timeFinished).reversed())
-                .limit(limit)
-                .map(PlayedTrack::toMap)
-                .toList();
+    public PlayedTrack findMostPopularTrack() {
+        return recentlyReleasedTracks.stream()
+                .max(Comparator.comparingInt(PlayedTrack::currentPopularity))
+                .orElse(null);
     }
 
     public PlayedTrack findMostNicheTrack() {
         return recentlyReleasedTracks.stream()
                 .min(Comparator.comparingInt(PlayedTrack::currentPopularity))
-                .orElse(null);
-    }
-
-    public PlayedTrack findMostPopularTrack() {
-        return recentlyReleasedTracks.stream()
-                .max(Comparator.comparingInt(PlayedTrack::currentPopularity))
                 .orElse(null);
     }
 }
